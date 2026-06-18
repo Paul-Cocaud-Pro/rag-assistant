@@ -39,3 +39,6 @@ yarn-error.log*
 # typescript
 *.tsbuildinfo
 next-env.d.ts
+
+# documents d'ingestion (volumineux, non nécessaires au déploiement)
+/documents
