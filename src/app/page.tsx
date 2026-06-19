@@ -1,32 +1,54 @@
 "use client";
-import { useState } from "react";
+import { useState, useRef, useEffect } from "react";
 import StarryBackground from "./StarryBackground";
+import styles from "./chat.module.css";
 
-type Message = { role: "user" | "assistant"; content: string };
+type Source = { title: string; excerpt: string };
+type Message = { role: "user" | "assistant"; content: string; sources?: Source[] };
+
+const SUGGESTIONS = [
+  "Comment se forme un trou noir ?",
+  "Qu'est-ce qu'une naine blanche ?",
+  "Que voit le télescope James Webb ?",
+];
 
 export default function ChatPage() {
   const [messages, setMessages] = useState<Message[]>([]);
   const [input, setInput] = useState("");
   const [isLoading, setIsLoading] = useState(false);
+  const [openSources, setOpenSources] = useState<Record<number, boolean>>({});
+  const scrollRef = useRef<HTMLDivElement>(null);
 
-  const handleSubmit = async (e: React.FormEvent) => {
+  // Auto-scroll en bas à chaque nouveau contenu
+  useEffect(() => {
+    const el = scrollRef.current;
+    if (el) el.scrollTop = el.scrollHeight;
+  }, [messages, isLoading]);
+
+  const ask = (question: string) => {
+    if (!question.trim() || isLoading) return;
+    void send(question.trim());
+  };
+
+  const handleSubmit = (e: React.FormEvent) => {
     e.preventDefault();
-    if (!input.trim() || isLoading) return;
+    ask(input);
+  };
 
-    const userMessage: Message = { role: "user", content: input };
+  async function send(question: string) {
+    const userMessage: Message = { role: "user", content: question };
     const newMessages = [...messages, userMessage];
     setMessages(newMessages);
     setInput("");
     setIsLoading(true);
 
-    const assistantMessage: Message = { role: "assistant", content: "" };
-    setMessages([...newMessages, assistantMessage]);
+    setMessages([...newMessages, { role: "assistant", content: "" }]);
 
     const response = await fetch("/api/chat", {
       method: "POST",
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify({
-        messages: newMessages.map(m => ({
+        messages: newMessages.map((m) => ({
           role: m.role,
           parts: [{ type: "text", text: m.content }],
         })),
@@ -45,52 +67,172 @@ export default function ChatPage() {
     }
 
     setIsLoading(false);
+  }
+
+  const toggleSources = (i: number) =>
+    setOpenSources((s) => ({ ...s, [i]: !s[i] }));
+
+  const reset = () => {
+    setMessages([]);
+    setInput("");
+    setIsLoading(false);
+    setOpenSources({});
   };
+
+  const isEmpty = messages.length === 0 && !isLoading;
+  const showLoader =
+    isLoading && messages[messages.length - 1]?.content === "";
 
   return (
     <>
       <StarryBackground />
-      <main className="flex flex-col h-screen max-w-3xl mx-auto p-4">
-        <h1 className="text-2xl font-bold mb-6 text-center text-gray-900">
-          🔭 Assistant Astronomie
-        </h1>
-
-        <div className="flex-1 overflow-y-auto space-y-4 mb-4">
-          {messages.length === 0 && (
-            <div className="text-center text-gray-400 mt-20">
-              Pose une question sur l&apos;astronomie...
+      <main className={styles.main}>
+        <header className={styles.header}>
+          <div className={styles.headerInner}>
+            <img src="/logo.png" alt="" width={32} height={32} />
+            <span className={styles.headerTitle}>
+              Astralis
+            </span>
+          </div>
+          <button
+            onClick={reset}
+            title="Nouvelle conversation"
+            className={styles.resetBtn}
+          >
+            ↺
+          </button>
+        </header>
+        <div
+          ref={scrollRef}
+          className={styles.conversation}
+        >
+          {isEmpty && (
+            <div className={styles.empty}>
+              {/* <div className={styles.logoWrapper}>
+                <div
+                  className={styles.logoGlow}
+                />
+                <img src="/logo.png" alt="" className={styles.logoLarge} />
+              </div> */}
+              <div>
+                <div className={styles.emptyTitle}>
+                  Pose une question sur l&apos;astronomie…
+                </div>
+                <div className={styles.emptySubtitle}>
+                  Réponses sourcées depuis la base documentaire
+                </div>
+              </div>
+              <div className={styles.suggestions}>
+                {SUGGESTIONS.map((s) => (
+                  <button
+                    key={s}
+                    onClick={() => ask(s)}
+                    className={styles.suggestionBtn}
+                  >
+                    {s}
+                  </button>
+                ))}
+              </div>
             </div>
           )}
-          {messages.map((m, i) => (
-            <div key={i} className={`flex ${m.role === "user" ? "justify-end" : "justify-start"}`}>
-              <div className={`max-w-[80%] rounded-lg px-4 py-2 ${m.role === "user" ? "bg-blue-600 text-white" : "bg-gray-100 text-gray-900"}`}>
-                <p className="whitespace-pre-wrap">{m.content}</p>
+
+          {messages.map((m, i) => {
+            const isUser = m.role === "user";
+            const hasSources = !isUser && !!m.sources?.length;
+            return (
+              <div
+                key={i}
+                className={isUser ? styles.rowUser : styles.rowAssistant}
+              >
+                {isUser ? (
+                  <div
+                    className={styles.bubbleUser}
+                  >
+                    <p>{m.content}</p>
+                  </div>
+                ) : (
+                  <div className={styles.bubbleAssistant}>
+                    <p >{m.content}</p>
+
+                    {hasSources && (
+                      <div className={styles.sourcesWrapper}>
+                        <button
+                          onClick={() => toggleSources(i)}
+                          className={styles.sourcesToggle}
+                        >
+                          <span className={styles.sourcesIcon}>✦</span>
+                          <span>Sources · {m.sources!.length}</span>
+                          <span className={openSources[i] ? styles.chevronOpen : styles.chevron}>⌄</span>
+                        </button>
+                        {openSources[i] && (
+                          <div className={styles.sourcesList}>
+                            {m.sources!.map((src, si) => (
+                              <div
+                                key={si}
+                                className={styles.sourceItem}
+                              >
+                                <div className={styles.sourceTitle}>
+                                  {si + 1} · {src.title}
+                                </div>
+                                <div className={styles.sourceExcerpt}>
+                                  {src.excerpt}
+                                </div>
+                              </div>
+                            ))}
+                          </div>
+                        )}
+                      </div>
+                    )}
+
+                    {!isLoading && m.content && (
+                      <button
+                        onClick={() => navigator.clipboard?.writeText(m.content)}
+                        className={styles.copyBtn}
+                      >
+                        Copier
+                      </button>
+                    )}
+                  </div>
+                )}
               </div>
-            </div>
-          ))}
-          {isLoading && messages[messages.length - 1]?.content === "" && (
-            <div className="flex justify-start">
-              <div className="bg-gray-100 rounded-lg px-4 py-2 text-gray-500">
-                ⏳ Recherche dans les documents...
-              </div>
+            );
+          })}
+
+          {showLoader && (
+            <div
+              className={styles.loader}
+            >
+              <span className={styles.loaderText}>
+                Recherche dans les étoiles
+              </span>
+              <span className={styles.loaderDots}>
+                {[0, 0.2, 0.4].map((d) => (
+                  <span
+                    key={d}
+                    className={styles.dot}
+                  />
+                ))}
+              </span>
             </div>
           )}
         </div>
-
-        <form onSubmit={handleSubmit} className="flex gap-2">
+        <form onSubmit={handleSubmit} className={styles.inputBar}>
           <input
             value={input}
             onChange={(e) => setInput(e.target.value)}
-            placeholder="Ex: Comment se forme un trou noir ?"
+            placeholder="Pose une question sur l'astronomie…"
             disabled={isLoading}
-            className="flex-1 border border-gray-300 rounded-lg px-4 py-2 focus:outline-none focus:ring-2 focus:ring-blue-500 disabled:opacity-50 text-gray-900"
+            className={styles.input}
           />
           <button
             type="submit"
             disabled={isLoading || !input.trim()}
-            className="bg-blue-600 text-white px-6 py-2 rounded-lg hover:bg-blue-700 disabled:opacity-50 font-medium"
+            className={styles.sendBtn}
           >
-            Envoyer
+            <svg width="19" height="19" viewBox="0 0 24 24" fill="none" stroke="#0a0b12" strokeWidth="2.2" strokeLinecap="round" strokeLinejoin="round">
+              <path d="M12 19V5" />
+              <path d="M5 12l7-7 7 7" />
+            </svg>
           </button>
         </form>
       </main>

@@ -32,21 +32,35 @@ export async function POST(req: Request) {
     );
     const { data: chunks, error } = await supabase.rpc("match_documents", {
         query_embedding: queryVector,
-        match_count: 4,          // récupérer les 4 chunks les plus pertinents
-        match_threshold: 0.5,    // ignorer les chunks trop éloignés sémantiquement
+        match_count: 6,          // récupérer les 4 chunks les plus pertinents
+        match_threshold: 0.3,    // ignorer les chunks trop éloignés sémantiquement
     });
     if (error) {
         return new Response(JSON.stringify({ error: error.message }), { status: 500 });
     }
 
   // 4. Construire le prompt système avec le contexte
-    const context = chunks?.map((c: { content: string }) => c.content).join("\n\n") ?? "Aucun document pertinent trouvé.";
+    const context = chunks?.map((c: { content: string; metadata?: { source_url?: string } }) => {
+      const url = c.metadata?.source_url;
+      return url ? `[Source: ${url}]\n${c.content}` : c.content;
+    }).join("\n\n") ?? "Aucun document pertinent trouvé.";
 
-    const systemPrompt = `Tu es un assistant spécialisé en astronomie. 
-    Tu réponds aux questions en te basant UNIQUEMENT sur le contexte de documents fourni ci-dessous.
-    Si la réponse ne se trouve pas dans le contexte, dis clairement : "Je ne trouve pas cette information dans les documents disponibles."
-    Ne jamais inventer d'information qui n'est pas dans le contexte.
-
+    const systemPrompt = `Tu es Astralis, un assistant passionné d'astronomie.
+      Tu réponds de façon détaillée, précise et enthousiaste, comme un astrophysicien 
+      qui explique à un ami curieux.
+      Tu n'hésites pas à donner des chiffres concrets, des exemples, des comparaisons 
+      d'échelle.
+      Tu utilises le contexte documentaire fourni ET tes connaissances générales pour 
+      enrichir la réponse.
+      Minimum 3-4 paragraphes pour toute question substantielle.
+      Si le contexte documentaire ne contient pas la réponse, réponds quand même 
+      avec tes connaissances, en le signalant : "D'après mes connaissances générales..."
+      Le contexte documentaire peut contenir des extraits en français et en anglais. 
+      Tu réponds toujours en français, quelle que soit la langue des sources.
+      Ne commence jamais ta réponse par "Bien sûr", "Absolument", "Certainement" 
+      ou toute formule d'acquiescement générique.
+      Évite les listes à puces sauf si l'utilisateur en demande explicitement — 
+      privilégie des paragraphes fluides et narratifs.
     CONTEXTE :
     ${context}`;
 
