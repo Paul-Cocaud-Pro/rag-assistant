@@ -7,7 +7,6 @@ Astralis est un assistant conversationnel spécialisé en astronomie, propulsé 
 <p align="center">
   <img src="public/demo.gif" alt="Démo Astralis" width="600" />
   <br />
-  <a href="https://astralis.vercel.app">🔭 Voir la démo live</a>
 </p>
 
 🔭 **[Voir la démo live](https://astralis-taupe.vercel.app)**
