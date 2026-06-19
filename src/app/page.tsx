@@ -3,8 +3,11 @@ import { useState, useRef, useEffect } from "react";
 import StarryBackground from "./StarryBackground";
 import styles from "./chat.module.css";
 
-type Source = { title: string; excerpt: string };
-type Message = { role: "user" | "assistant"; content: string; sources?: Source[] };
+type Message = { 
+  role: "user" | "assistant"; 
+  content: string; 
+  sourceUrls?: string[];
+};
 
 const SUGGESTIONS = [
   "Comment se forme un trou noir ?",
@@ -16,7 +19,6 @@ export default function ChatPage() {
   const [messages, setMessages] = useState<Message[]>([]);
   const [input, setInput] = useState("");
   const [isLoading, setIsLoading] = useState(false);
-  const [openSources, setOpenSources] = useState<Record<number, boolean>>({});
   const scrollRef = useRef<HTMLDivElement>(null);
 
   // Auto-scroll en bas à chaque nouveau contenu
@@ -58,25 +60,41 @@ export default function ChatPage() {
     const reader = response.body!.getReader();
     const decoder = new TextDecoder();
     let fullText = "";
+    let sourceUrls: string[] = [];
+    let firstChunk = true;
 
     while (true) {
       const { done, value } = await reader.read();
       if (done) break;
-      fullText += decoder.decode(value, { stream: true });
-      setMessages([...newMessages, { role: "assistant", content: fullText }]);
+      const chunk = decoder.decode(value, { stream: true });
+      
+      if (firstChunk) {
+        firstChunk = false;
+        const newlineIndex = chunk.indexOf("\n");
+        if (newlineIndex !== -1) {
+          try {
+            const meta = JSON.parse(chunk.slice(0, newlineIndex));
+            if (meta.__sources) sourceUrls = meta.__sources;
+            fullText += chunk.slice(newlineIndex + 1);
+          } catch {
+            fullText += chunk;
+          }
+        } else {
+          fullText += chunk;
+        }
+      } else {
+        fullText += chunk;
+      }
+      setMessages([...newMessages, { role: "assistant", content: fullText, sourceUrls }]);
     }
 
     setIsLoading(false);
   }
 
-  const toggleSources = (i: number) =>
-    setOpenSources((s) => ({ ...s, [i]: !s[i] }));
-
   const reset = () => {
     setMessages([]);
     setInput("");
     setIsLoading(false);
-    setOpenSources({});
   };
 
   const isEmpty = messages.length === 0 && !isLoading;
@@ -138,49 +156,36 @@ export default function ChatPage() {
 
           {messages.map((m, i) => {
             const isUser = m.role === "user";
-            const hasSources = !isUser && !!m.sources?.length;
             return (
               <div
                 key={i}
                 className={isUser ? styles.rowUser : styles.rowAssistant}
               >
                 {isUser ? (
-                  <div
-                    className={styles.bubbleUser}
-                  >
+                  <div className={styles.bubbleUser}>
                     <p>{m.content}</p>
                   </div>
                 ) : (
                   <div className={styles.bubbleAssistant}>
-                    <p >{m.content}</p>
+                    <p>{m.content}</p>
 
-                    {hasSources && (
+                    {!isLoading && m.sourceUrls && m.sourceUrls.length > 0 && (
                       <div className={styles.sourcesWrapper}>
-                        <button
-                          onClick={() => toggleSources(i)}
-                          className={styles.sourcesToggle}
-                        >
-                          <span className={styles.sourcesIcon}>✦</span>
-                          <span>Sources · {m.sources!.length}</span>
-                          <span className={openSources[i] ? styles.chevronOpen : styles.chevron}>⌄</span>
-                        </button>
-                        {openSources[i] && (
-                          <div className={styles.sourcesList}>
-                            {m.sources!.map((src, si) => (
-                              <div
-                                key={si}
-                                className={styles.sourceItem}
+                        <div className={styles.sourcesLabel}>Sources</div>
+                        <ul className={styles.sourceUrlsList}>
+                          {m.sourceUrls.map((url, si) => (
+                            <li key={si}>
+                              <a
+                                href={url}
+                                target="_blank"
+                                rel="noopener noreferrer"
+                                className={styles.sourceUrl}
                               >
-                                <div className={styles.sourceTitle}>
-                                  {si + 1} · {src.title}
-                                </div>
-                                <div className={styles.sourceExcerpt}>
-                                  {src.excerpt}
-                                </div>
-                              </div>
-                            ))}
-                          </div>
-                        )}
+                                {url}
+                              </a>
+                            </li>
+                          ))}
+                        </ul>
                       </div>
                     )}
 

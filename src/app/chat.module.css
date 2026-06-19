@@ -377,3 +377,35 @@
   cursor: default;
   transform: none;
 }
+
+.sourcesLabel {
+  font-family: monospace;
+  font-size: 11px;
+  letter-spacing: 0.3px;
+  color: #7fe9ee;
+  margin-bottom: 6px;
+  margin-top: 14px;
+}
+
+.sourceUrlsList {
+  list-style: none;
+  padding: 0;
+  margin: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+}
+
+.sourceUrl {
+  font-family: monospace;
+  font-size: 11px;
+  color: #7b8190;
+  text-decoration: none;
+  transition: color 0.15s;
+  word-break: break-all;
+}
+
+.sourceUrl:hover {
+  color: #a99fff;
+  text-decoration: underline;
+}

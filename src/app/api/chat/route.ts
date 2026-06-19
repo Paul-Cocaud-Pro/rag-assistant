@@ -40,6 +40,13 @@ export async function POST(req: Request) {
     }
 
   // 4. Construire le prompt système avec le contexte
+
+  const sourceUrls = [...new Set(
+      chunks
+        ?.map((c: { metadata?: { source_url?: string } }) => c.metadata?.source_url)
+        .filter(Boolean) ?? []
+    )] as string[];
+
     const context = chunks?.map((c: { content: string; metadata?: { source_url?: string } }) => {
       const url = c.metadata?.source_url;
       return url ? `[Source: ${url}]\n${c.content}` : c.content;
@@ -72,9 +79,6 @@ export async function POST(req: Request) {
             .map(p => p.text)
             .join(" "),
     }));
-    console.log("Chunks trouvés:", chunks?.length ?? 0);
-    console.log("Contexte (200 premiers caractères):", context.slice(0, 200));
-    console.log("Messages formatés:", JSON.stringify(formattedMessages, null, 2));
 
     const result = streamText({
         model: openai("gpt-4o-mini"),
@@ -82,5 +86,24 @@ export async function POST(req: Request) {
         messages: formattedMessages,
     });
 
-    return result.toTextStreamResponse();
+    // Envoyer les URLs en premier, puis le stream
+    const encoder = new TextEncoder();
+    const sourcePrefix = JSON.stringify({ __sources: sourceUrls }) + "\n";
+
+    const stream = new ReadableStream({
+      async start(controller) {
+        controller.enqueue(encoder.encode(sourcePrefix));
+        const reader = result.toTextStreamResponse().body!.getReader();
+        while (true) {
+          const { done, value } = await reader.read();
+          if (done) break;
+          controller.enqueue(value);
+        }
+        controller.close();
+      }
+    });
+
+    return new Response(stream, {
+      headers: { "Content-Type": "text/plain; charset=utf-8" }
+    });
 }
