@@ -169,7 +169,10 @@ export default function ChatPage() {
                   <div className={styles.bubbleAssistant}>
                     <p>{m.content}</p>
 
-                    {!isLoading && m.sourceUrls && m.sourceUrls.length > 0 && (
+                    {!isLoading &&
+                      m.sourceUrls &&
+                      m.sourceUrls.length > 0 &&
+                      m.content.toLowerCase().startsWith("d'après ma base documentaire") && (
                       <div className={styles.sourcesWrapper}>
                         <div className={styles.sourcesLabel}>Sources</div>
                         <ul className={styles.sourceUrlsList}>

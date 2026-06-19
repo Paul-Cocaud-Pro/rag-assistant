@@ -7,7 +7,6 @@ import { createClient } from "@supabase/supabase-js";
 export async function POST(req: Request) {
   // 1. Récupérer les messages de la requête
     const body = await req.json();
-    console.log("Body reçu:", JSON.stringify(body, null, 2));
     const { messages } = body;
     const lastMessage = messages[messages.length - 1].parts
         .filter((p: { type: string }) => p.type === "text")
@@ -33,13 +32,12 @@ export async function POST(req: Request) {
     const { data: chunks, error } = await supabase.rpc("match_documents", {
         query_embedding: queryVector,
         match_count: 6,          // récupérer les 6 chunks les plus pertinents
-        match_threshold: 0.4,    // ignorer les chunks trop éloignés sémantiquement
+        match_threshold: 0.45,    // ignorer les chunks trop éloignés sémantiquement
     });
     if (error) {
         return new Response(JSON.stringify({ error: error.message }), { status: 500 });
     }
     const hasChunks = chunks && chunks.length > 0;
-    console.log("Top chunk score:", chunks?.[0]?.similarity, "| count:", chunks?.length);
 
   // 4. Construire le prompt système avec le contexte
 
