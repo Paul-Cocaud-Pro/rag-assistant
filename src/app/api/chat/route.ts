@@ -39,6 +39,7 @@ export async function POST(req: Request) {
         return new Response(JSON.stringify({ error: error.message }), { status: 500 });
     }
     const hasChunks = chunks && chunks.length > 0;
+    console.log("Top chunk score:", chunks?.[0]?.similarity, "| count:", chunks?.length);
 
   // 4. Construire le prompt système avec le contexte
 
@@ -64,7 +65,6 @@ export async function POST(req: Request) {
 
       CONTEXTE :
       ${context}` : 
-      
       `Tu es Astralis, un assistant passionné d'astronomie et d'astrophysique.
 
       Ta base documentaire ne contient aucun passage pertinent sur le sujet de cette question. Procède en deux temps :
