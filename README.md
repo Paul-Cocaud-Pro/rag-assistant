@@ -1,6 +1,6 @@
 # Astralis ✦ — Assistant Astronomie RAG
 
-Astralis est un assistant conversationnel spécialisé en astronomie, propulsé par une architecture RAG (Retrieval-Augmented Generation). Contrairement à un simple chatbot, Astralis ne répond pas depuis sa mémoire : il recherche d'abord les passages les plus pertinents dans une base documentaire de plus de 60 sources (Wikipedia FR, OpenStax Astronomy, articles scientifiques), puis génère une réponse précise et sourcée en s'appuyant sur ce contexte. Le résultat : des réponses détaillées, enthousiasmes et ancrées dans des documents vérifiables — avec les liens sources affichés en fin de réponse.
+Astralis est un assistant conversationnel spécialisé en astronomie, propulsé par une architecture RAG (Retrieval-Augmented Generation). Contrairement à un simple chatbot, Astralis ne répond pas depuis sa mémoire : il recherche d'abord les passages les plus pertinents dans une base documentaire de plus de 60 sources (Wikipedia FR, OpenStax Astronomy, articles scientifiques), puis génère une réponse précise et sourcée en s'appuyant sur ce contexte. Le résultat : des réponses détaillées, enthousiastes et ancrées dans des documents vérifiables — avec les liens sources affichés en fin de réponse.
 
 Sa particularité : Astralis distingue explicitement ce qui provient de son corpus documentaire de ce qui relève des connaissances générales du modèle, et refuse poliment les questions hors astronomie. Il assume de signaler quand une information n'est pas dans ses sources plutôt que d'inventer une réponse.
 
@@ -37,7 +37,7 @@ Sa particularité : Astralis distingue explicitement ce qui provient de son corp
 La question de l'utilisateur est transformée en vecteur de 1536 dimensions via l'API OpenAI (`text-embedding-3-small`).
  
 **2. Recherche vectorielle**
-Ce vecteur est comparé par similarité cosinus aux ~80 000 chunks stockés dans Supabase/pgvector via la fonction `match_documents`. Les 6 chunks les plus proches sémantiquement sont récupérés, à condition de dépasser un seuil de similarité de **0.45**. Ce seuil agit comme un filtre : il écarte les passages trop éloignés et sert d'aiguillage entre les deux modes.
+Ce vecteur est comparé par similarité cosinus aux près de 15 000 chunks stockés dans Supabase/pgvector via la fonction `match_documents`. Les 6 chunks les plus proches sémantiquement sont récupérés, à condition de dépasser un seuil de similarité de **0.45**. Ce seuil agit comme un filtre : il écarte les passages trop éloignés et sert d'aiguillage entre les deux modes.
  
 **3a. Mode ancré — au moins un chunk pertinent**
 Les chunks récupérés sont injectés dans le prompt système avec leurs URLs sources. Le modèle répond en **grounding strict** : il s'appuie uniquement sur ces passages, sans recourir à ses connaissances propres, et signale clairement si les passages ne couvrent pas la question. La réponse commence par **« D'après ma base documentaire, »** et les liens sources sont affichés en fin de réponse.
