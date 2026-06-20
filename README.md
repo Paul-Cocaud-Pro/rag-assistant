@@ -2,6 +2,8 @@
 
 Astralis est un assistant conversationnel spécialisé en astronomie, propulsé par une architecture RAG (Retrieval-Augmented Generation). Contrairement à un simple chatbot, Astralis ne répond pas depuis sa mémoire : il recherche d'abord les passages les plus pertinents dans une base documentaire de plus de 60 sources (Wikipedia FR, OpenStax Astronomy, articles scientifiques), puis génère une réponse précise et sourcée en s'appuyant sur ce contexte. Le résultat : des réponses détaillées, enthousiasmes et ancrées dans des documents vérifiables — avec les liens sources affichés en fin de réponse.
 
+Sa particularité : Astralis distingue explicitement ce qui provient de son corpus documentaire de ce qui relève des connaissances générales du modèle, et refuse poliment les questions hors astronomie. Il assume de signaler quand une information n'est pas dans ses sources plutôt que d'inventer une réponse.
+
 ## Démo
 
 <p align="center">
@@ -29,21 +31,24 @@ Astralis est un assistant conversationnel spécialisé en astronomie, propulsé 
 
 ## Comment ça marche
 
-Le pipeline RAG se déroule en 4 étapes à chaque question :
-
+À chaque question, Astralis effectue une recherche vectorielle, puis **bascule dans l'un de deux modes** selon que le corpus contient ou non des passages pertinents.
+ 
 **1. Embedding de la question**
 La question de l'utilisateur est transformée en vecteur de 1536 dimensions via l'API OpenAI (`text-embedding-3-small`).
-
+ 
 **2. Recherche vectorielle**
-Ce vecteur est comparé par similarité cosinus aux ~80 000 chunks stockés dans Supabase/pgvector via la fonction `match_documents`. Les 6 chunks les plus proches sémantiquement sont récupérés (threshold : 0.3).
-
-**3. Construction du contexte**
-Les chunks pertinents sont injectés dans le prompt système avec leurs URLs sources. Le modèle dispose ainsi du contexte documentaire pour ancrer sa réponse.
-
+Ce vecteur est comparé par similarité cosinus aux ~80 000 chunks stockés dans Supabase/pgvector via la fonction `match_documents`. Les 6 chunks les plus proches sémantiquement sont récupérés, à condition de dépasser un seuil de similarité de **0.45**. Ce seuil agit comme un filtre : il écarte les passages trop éloignés et sert d'aiguillage entre les deux modes.
+ 
+**3a. Mode ancré — au moins un chunk pertinent**
+Les chunks récupérés sont injectés dans le prompt système avec leurs URLs sources. Le modèle répond en **grounding strict** : il s'appuie uniquement sur ces passages, sans recourir à ses connaissances propres, et signale clairement si les passages ne couvrent pas la question. La réponse commence par **« D'après ma base documentaire, »** et les liens sources sont affichés en fin de réponse.
+ 
+**3b. Mode replié — aucun chunk pertinent**
+Quand aucun passage ne dépasse le seuil, deux cas se présentent. Si la question ne concerne pas l'astronomie ou l'astrophysique, Astralis **refuse poliment** et invite à reformuler. Si elle est bien astronomique mais absente du corpus, le modèle répond à partir de ses **connaissances générales**, en préfixant sa réponse par **« À titre général, hors de ma base documentaire, »** — et sans afficher de sources, puisque la réponse n'est pas ancrée dans le corpus.
+ 
 **4. Génération streamée**
-`gpt-4o-mini` génère la réponse en streaming via l'AI SDK de Vercel. Les URLs sources sont envoyées en préfixe du stream et affichées en fin de réponse sous forme de liens cliquables.
+`gpt-4o-mini` génère la réponse en streaming via l'AI SDK de Vercel. Les URLs sources sont envoyées en préfixe du stream et n'apparaissent côté interface que pour les réponses réellement ancrées dans le corpus.
 
-### Schéma du pipelaine
+### Schéma du pipeline
 ```
 Question utilisateur
         │
@@ -51,17 +56,43 @@ Question utilisateur
 [Embedding OpenAI]
         │
         ▼
-[Recherche pgvector] ──► 6 chunks pertinents
+[Recherche pgvector]
         │
         ▼
-[Prompt système + contexte]
+Au moins un chunk au-dessus du seuil (0.45) ?
         │
-        ▼
-[GPT-4o-mini streaming]
-        │
-        ▼
-Réponse + sources
+   ┌────┴──────────────┐
+  OUI                 NON
+   │                   │
+   ▼                   ▼
+[Grounding strict]   Question astronomique ?
+   │               ┌───┴─────────┐
+   │              OUI           NON
+   │               │             │
+   │               ▼             ▼
+   │         [Connaissances  [Refus poli]
+   │          générales]
+   ▼               ▼             │
+"D'après ma    "À titre        invitation
+ base doc."     général…"      à reformuler
+ + sources      sans source    sans source
+   │               │             │
+   └───────────────┴─────────────┘
+                   ▼
+         [GPT-4o-mini streaming]
+                   ▼
+                Réponse
 ```
+---
+
+## Choix de conception
+ 
+**Traçabilité avant tout.** L'intérêt d'une architecture RAG n'est pas de « savoir plus » qu'un modèle généraliste, mais de fournir des réponses *vérifiables*. Astralis affiche les passages et liens sources sur lesquels il s'appuie, et distingue visuellement une réponse sourcée d'une réponse issue des connaissances générales du modèle.
+ 
+**Honnêteté sur les limites.** Plutôt que d'halluciner une réponse confiante quand le corpus est muet, Astralis le signale explicitement. Un assistant qui dit « cette information n'est pas dans mes sources » est plus fiable qu'un assistant qui invente.
+ 
+**Cadrage du domaine.** Le garde-fou hors-domaine s'appuie sur le corpus lui-même : comme la base ne contient que de l'astronomie, toute question étrangère au sujet ne remonte aucun passage et déclenche un refus poli — sans nécessiter de classifieur dédié.
+ 
 ---
 
 ## Installation locale
